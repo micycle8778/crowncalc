@@ -1,4 +1,5 @@
 import std/lists
+import std/math
 import std/parseutils
 import std/sets
 import std/strformat
@@ -21,22 +22,22 @@ runnableExamples:
 
 type 
   EquationKind* = enum
-    ekNumber, ekAdd, ekSubtract, ekMultiply, ekDivide
+    ekNumber, ekAdd, ekSubtract, ekMultiply, ekDivide, ekExponent
 
   Equation* = ref object
     case kind: EquationKind
       of ekNumber: n: float
-      of ekAdd, ekSubtract, ekMultiply, ekDivide: left, right: Equation
+      of ekAdd, ekSubtract, ekMultiply, ekDivide, ekExponent: left, right: Equation
 
   TokenKind* = enum
     tkNumber, tkPercentage, tkAdd, tkSubtract, tkMultiply, tkDivide, tkGroupOpen,
-    tkGroupClose, tkEquation
+    tkGroupClose, tkEquation, tkExponent
 
   Token* = object
     case kind: TokenKind
       of tkNumber, tkPercentage: n: float
       of tkEquation: e: Equation
-      of tkAdd, tkSubtract, tkMultiply, tkDivide, tkGroupOpen, tkGroupClose: nil
+      of tkAdd, tkSubtract, tkMultiply, tkDivide, tkGroupOpen, tkGroupClose, tkExponent: nil
   
   TokenString* = DoublyLinkedList[Token]
   
@@ -140,6 +141,9 @@ func lexString*(s: string): TokenString =
         arr.remove(arr.head)
       of '/'.Rune, 0xf7.Rune: # 0xf7 == ÷
         result.add Token(kind: tkDivide)
+        arr.remove(arr.head)
+      of '^'.Rune:
+        result.add Token(kind: tkExponent)
         arr.remove(arr.head)
       of '%'.Rune:
         raise LexError.newException("Misplaced '%'")
@@ -264,10 +268,13 @@ func parseTokens*(arr: TokenString): Equation =
           Token(kind: tkEquation, e: Equation(kind: ekMultiply, left: left, right: right))
         of ekDivide:
           Token(kind: tkEquation, e: Equation(kind: ekDivide, left: left, right: right))
+        of ekExponent:
+          Token(kind: tkEquation, e: Equation(kind: ekExponent, left: left, right: right))
         of ekNumber:
           raise Defect.newException("Unsupported Equation Kind")
       arr.snipAndReplace(flag.prev.prev, flag.next.next, eq)
 
+    op({tkExponent: ekExponent}.toTable)
     op({tkMultiply: ekMultiply, tkDivide: ekDivide}.toTable)
     op({tkAdd: ekAdd, tkSubtract: ekSubtract}.toTable)
 
@@ -298,6 +305,8 @@ func solve*(e: Equation): float =
         raise SolveError.newException("Cannot divide by zero")
       else:
         e.left.solve() / right
+    of ekExponent:
+      pow(e.left.solve(), e.right.solve())
 
 func solve*(s: string): float =
   ## Alias for `s.lexString.parseTokens.solve`

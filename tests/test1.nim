@@ -14,6 +14,12 @@ test "multiply":
 test "divide":
   check "4/2".solve == 2
 
+test "exponent":
+  check "2^3".solve == 8
+
+test "groups":
+  check "(3+2)*5".solve == 25
+
 test "subtract negative":
   check "2-3".solve == -1
 
@@ -43,5 +49,5 @@ test "order of operations":
 test "order of operations 2":
   check "2-15+3".solve == -10
 
-test "groups":
-  check "(3+2)*5".solve == 25
+test "order of operations 3":
+  check "2^4/4".solve == 4
