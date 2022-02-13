@@ -1,6 +1,6 @@
 # Package
 
-version           = "0.2.1"
+version           = "0.3.0"
 author            = "Rainbow Asteroids"
 description       = "Basic calculator in Nim"
 license           = "MIT"
