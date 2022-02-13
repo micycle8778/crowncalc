@@ -48,16 +48,13 @@ proc shrink(rs: var ResultString) =
   else:
     rs.s.setLen(max(0, rs.s.len - 1))
 
+
 # Init
 doAssert sdl2.init(INIT_EVERYTHING) == SdlSuccess
 doAssert ttfInit() == SdlSuccess
 
 const 
-  width = 720
-  height = 640
   resPadding = 40
-  resSize = Size(w: width - resPadding, h: height div 4)
-  btnSize = Size(w: (width div 6).cint, h: (height * (3/16)).cint)
 
 # Colors
   bg = (29.uint8, 32.uint8, 33.uint8, 255.uint8)
@@ -68,18 +65,27 @@ const
   btnFg = (235.uint8, 219.uint8, 178.uint8, 255.uint8)
 
 # Font
-const font_data = slurp"../SpaceMono-Italic.ttf"
-var font_RWops = rwFromConstMem(font_data.cstring, font_data.len)
-let btnFont = font_RWops.openFontRW(1, 64)
+const fontData = slurp"../SpaceMono-Italic.ttf"
 
-var resFonts = initTable[cint, FontPtr]()
+func getOptimalFontSize(width, height, charCount: int): int =
+  let max_x = (width.float - 10).float * 1.63 / charCount.float
+  let max_y = height.float * 0.67
+  return round(min(max_x, max_y)).int
+
+var fonts = initTable[int, FontPtr]()
+proc getFont(size: int): FontPtr =
+  if size notin fonts:
+    let fontRWops = rwFromConstMem(fontData.cstring, fontData.len)
+    fonts[size] = font_RWops.openFontRW(1, size.cint)
+
+  return fonts[size]
 
 # Window
 var
   window: WindowPtr
   render: RendererPtr
 
-window = createWindow("Crowncalc", 100, 100, width, height, SDL_WINDOW_SHOWN)
+window = createWindow("Crowncalc", 100, 100, 720, 640, SDL_WINDOW_SHOWN or SDL_WINDOW_RESIZABLE)
 render = createRenderer(window, -1, Renderer_Accelerated or Renderer_PresentVsync or Renderer_TargetTexture)
 
 var
@@ -114,7 +120,8 @@ proc button(render: RendererPtr, x, y, width, height: cint, text: string, left_b
   render.fillRect(rect)
 
   # # Render Text
-  let surface = renderUTF8Blended(btnFont, text, btnFg)
+  let font = getFont(getOptimalFontSize(width, height, 1)) # WARN: hardcoded 1 could bite me later
+  let surface = renderUTF8Blended(font, text, btnFg)
   let texture = createTextureFromSurface(render, surface)
 
   var font_width, font_height: cint
@@ -159,16 +166,13 @@ while runGame:
           expression.shrink
       else:
         discard
-  # # Generate result font
-  let max_x = (resSize.w - 10).float * 1.63 / expression.s.len.float
-  let max_y = resSize.h.float * 0.67
-  let resFontSize = round(min(max_x, max_y)).cint
+  # # Generate button sizes
+  var width, height: cint
 
-  if resFontSize notin resFonts:
-    font_RWops = rwFromConstMem(font_data.cstring, font_data.len)
-    resFonts[resFontSize] = font_RWops.openFontRW(1, resFontSize)
+  window.getSize(width, height)
 
-  let resFont = resFonts[resFontSize]
+  let resSize = Size(w: width - resPadding, h: height div 4)
+  let btnSize = Size(w: (width div 6).cint, h: (height.float * (3/16)).cint)
 
   # # Clear the screen
   render.setDrawColor bg
@@ -208,6 +212,8 @@ while runGame:
     expression.solve
 
   # # Output
+  let resFont = getFont(getOptimalFontSize(resSize.w, resSize.h, expression.s.len))
+
   let surface = renderUTF8Blended(resFont, expression.s.cstring, if expression.errorMode: errorFg else: fg)
   let texture = createTextureFromSurface(render, surface)
 
