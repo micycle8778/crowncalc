@@ -23,8 +23,8 @@ test "groups":
 test "subtract negative":
   check "2-3".solve == -1
 
-test "negative exponent"
-  check "2^-2".solve == -0.25
+test "negative exponent":
+  check "2^-2".solve == 0.25
 
 test "many numbers":
   check "1+2+3+4".solve == 10
@@ -54,3 +54,25 @@ test "order of operations 2":
 
 test "order of operations 3":
   check "2^4/4".solve == 4
+
+test "order of operations 4":
+  check "5*3+7*4".solve == 43
+
+test "group sandwich":
+  check "(5+4)*(7+3)".solve == 90
+
+test "unbalanced groups":
+  expect(CalcError):
+    discard "(((5))".solve
+
+test "front operator":
+  expect(CalcError):
+    discard "*5".solve
+
+test "back operator":
+  expect(CalcError):
+    discard "5*".solve
+
+test "divide by zero":
+  expect(CalcError):
+    discard "1/0".solve

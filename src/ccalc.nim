@@ -21,11 +21,13 @@ proc initResultString(): ResultString =
   ResultString(s: "", resultMode: false, errorMode: false, history: newSeq[string](), historyPtr: 1)
 
 proc clear(rs: var ResultString) =
+  # Clear the result string
   rs.resultMode = false
   rs.errorMode = false
   rs.s.setLen(0)
 
 proc extend(rs: var ResultString, s: string) =
+  # Add a character to the string
   if rs.errorMode:
     rs.clear
 
@@ -36,6 +38,7 @@ proc extend(rs: var ResultString, s: string) =
   rs.s.add s
 
 proc solve(rs: var ResultString) =
+  # Solve the string
   rs.history.add rs.s
   rs.historyPtr = 1
 
@@ -50,17 +53,20 @@ proc solve(rs: var ResultString) =
       rs.s = getCurrentExceptionMsg()
 
 proc shrink(rs: var ResultString) =
+  # Backspace
   if rs.resultMode or rs.errorMode:
     rs.clear
   else:
     rs.s.setLen(max(0, rs.s.len - 1))
 
 proc prev(rs: var ResultString) =
+  # Go up history
   rs.errorMode = false
   rs.s = rs.history[^rs.historyPtr]
   rs.historyPtr = min(rs.history.len, succ rs.historyPtr)
 
 proc next(rs: var ResultString) =
+  # Go down history
   rs.errorMode = false
   if rs.historyPtr != 1:
     rs.historyPtr = max(pred rs.historyPtr, 1)
@@ -211,7 +217,7 @@ while runGame:
   render.clear
 
   # # Buttons
-  # lookup table for following for loop
+  # lookup table for text buttons
   const lut = [
     ["7", "8", "9", "÷", "("],
     ["4", "5", "6", "×", ")"],
@@ -226,7 +232,7 @@ while runGame:
       render.textButton(
         (x * btnSize.w).cint,
         (resSize.h + y * btnSize.h).cint,
-        if x == 1 and y == 3: (btnSize.w * 2).cint else: btnSize.w,
+        if x == 1 and y == 3: (btnSize.w * 2).cint else: btnSize.w, # 0 is double width
         btnSize.h,
         lut[y][x],
         x == 0
@@ -236,6 +242,7 @@ while runGame:
   if render.button((5 * btnSize.w).cint, resSize.h, btnSize.w, btnSize.h, "←"):
     expression.shrink
 
+  # Clear key
   if render.button((5 * btnSize.w).cint, (1 * btnSize.h + resSize.h), btnSize.w, btnSize.h, "C"):
     expression.clear
 

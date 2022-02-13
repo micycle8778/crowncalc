@@ -4,8 +4,6 @@ import std/terminal
 import crowncalc
 import noise
 
-type ControlC = object of CatchableError
-
 proc main() =
   var noise = Noise.init()
   noise.setPrompt("👑 calc> ")

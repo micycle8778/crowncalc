@@ -1,3 +1,4 @@
+import std/enumutils
 import std/lists
 import std/math
 import std/parseutils
@@ -24,6 +25,7 @@ type
   EquationKind* = enum
     ekNumber, ekAdd, ekSubtract, ekMultiply, ekDivide, ekExponent
 
+  ## Object for math instructions
   Equation* = ref object
     case kind: EquationKind
       of ekNumber: n: float
@@ -33,6 +35,7 @@ type
     tkNumber, tkPercentage, tkAdd, tkSubtract, tkMultiply, tkDivide, tkGroupOpen,
     tkGroupClose, tkEquation, tkExponent
 
+  ## Computer representation of the math problem
   Token* = object
     case kind: TokenKind
       of tkNumber, tkPercentage: n: float
@@ -41,11 +44,27 @@ type
   
   TokenString* = DoublyLinkedList[Token]
   
+  ## Library error. You should catch this.
   CalcError* = object of CatchableError
 
   LexError* = object of CalcError
   ParseError* = object of CalcError
   SolveError* = object of CalcError
+
+proc `$`(tk: TokenKind): string =
+  case tk:
+    of tkAdd:
+      "+"
+    of tkSubtract:
+      "-"
+    of tkDivide:
+      "/"
+    of tkMultiply:
+      "*"
+    of tkExponent:
+      "^"
+    else:
+      tk.symbolName
 
 func makeAdd*(l, r: Equation): Equation =
   ## Helper function for making equation objects
@@ -77,6 +96,12 @@ func excludeChars(s: string, chars: HashSet[char]): string =
       result.add c
 
 proc snipAndReplace[T](list: var DoublyLinkedList[T], front, back: DoublyLinkedNode[T], x: T) =
+  # Cut a part of a list out and replaces it with x
+  # l = 1, 2, 3, 4
+  # l.snipAndReplace(1, 4, 5)
+  # l = 1, 5, 4
+  # l.snipAndReplace(nil, 4, 10)
+  # l = 10, 4
   var node = newDoublyLinkedNode(x)
   if not front.isNil:
     front.next = node
@@ -90,19 +115,23 @@ proc snipAndReplace[T](list: var DoublyLinkedList[T], front, back: DoublyLinkedN
     list.tail = node
 
 proc `$`(L: SinglyLinkedList[Rune]): string =
+  # Proc for turning the linked list into a string for parsing
   for r in L:
     result.add $r
 
 func lexString*(s: string): TokenString =
   ## Convert a string into a list of tokens that the computer can understand
   var s = s.excludeChars([',', '\'', '_', ' '].toHashSet)
-  if s == "":
+  if s == "": # empty expressions make no sense
     raise LexError.newException("Empty expression")
 
+  # handle a negative in the front
   if s[0] == '-':
     s = "0" & s
 
   result = initDoublyLinkedList[Token]()
+  # Since we're cutting from the front, it makes sense to use a linked list
+  # (and yes, order does matter here)
   var arr = initSinglyLinkedList[Rune]()
   for r in s.runes:
     arr.add r
@@ -111,6 +140,7 @@ func lexString*(s: string): TokenString =
     case arr.head.value:
       of '0'.Rune, '1'.Rune, '2'.Rune, '3'.Rune, '4'.Rune, '5'.Rune, '6'.Rune, '7'.Rune,
         '8'.Rune, '9'.Rune, '.'.Rune:
+        # If a number is found, then scan for more
         # TODO: Optimize this code by making a float scanner for linked lists
         var str = $arr
         var n: float
@@ -176,14 +206,17 @@ func parseTokens*(arr: TokenString): Equation =
     # groups
     block:
       var front = arr.head
+      # scan for a group open
       while not front.isNil and front.value.kind != tkGroupOpen:
         front = front.next
 
+      # if none is found, end
       if front.isNil:
         break
       
       var back = front.next
       var count = 1
+      # scan for a group close
       while not back.isNil and count > 0:
         if back.value.kind == tkGroupClose:
           dec count
@@ -192,9 +225,11 @@ func parseTokens*(arr: TokenString): Equation =
         else:
           back = back.next
 
+      # if we don't find a group close, then there's a missing group close
       if count > 0:
         raise ParseError.newException("Missing ')'")
 
+      # Create a new list of tokens, from the grouped area
       var list = initDoublyLinkedList[Token]()
 
       front.next.prev = nil
@@ -203,11 +238,22 @@ func parseTokens*(arr: TokenString): Equation =
       list.head = front.next
       list.tail = back.prev
       
+      # Then solve the new list
       let eq = Token(kind: tkEquation, e: parseTokens(list))
 
+      # Then cut out the group
       arr.snipAndReplace(front.prev, back.next, eq)
 
-    proc op(opTable: Table[TokenKind, EquationKind]) =
+      # Continue to avoid breaking the code
+      #
+      # (5+4)*(3+7)
+      # 9+(3+7)
+      # ParseError: Misplaced '*'
+      continue
+
+    proc op(opTable: Table[TokenKind, EquationKind]): bool =
+      # Scan for an operator and parse it into an equation
+      # Return whether or not the operator was found
       var flag = arr.head
       # Scan for the operator
       while not flag.isNil and flag.value.kind notin opTable:
@@ -215,11 +261,14 @@ func parseTokens*(arr: TokenString): Equation =
 
       # Break out of the block if the operator isn't found
       if flag.isNil:
-        return
+        return false
 
       # Check that there is a number on the left and right of the operator
-      if (flag == arr.head or flag == arr.tail) or 
-        (flag.prev.value.kind notin val_tokens or flag.next.value.kind notin val_tokens):
+      if (flag.prev.isNil or flag.next.isNil):
+        # Clearly, this must be a malformed equation
+        raise ParseError.newException(fmt"Misplaced '{flag.value.kind}'")
+
+      if (flag.prev.value.kind notin val_tokens or flag.next.value.kind notin val_tokens):
         # If there's a negative to the right of us, that probably means there's a
         # negative number there
         if flag.next.value.kind == tkSubtract:
@@ -274,10 +323,20 @@ func parseTokens*(arr: TokenString): Equation =
           raise Defect.newException("Unsupported Equation Kind")
       arr.snipAndReplace(flag.prev.prev, flag.next.next, eq)
 
-    op({tkExponent: ekExponent}.toTable)
-    op({tkMultiply: ekMultiply, tkDivide: ekDivide}.toTable)
-    op({tkAdd: ekAdd, tkSubtract: ekSubtract}.toTable)
+      return true
 
+    # We must continue if an operator was scanned, because if we didn't, we
+    # could break order of operations.
+    #
+    # 5 * 3 + 7 * 4
+    # 15 + 7 * 4
+    # 22 * 4 
+    # 88
+    if op({tkExponent: ekExponent}.toTable): continue
+    if op({tkMultiply: ekMultiply, tkDivide: ekDivide}.toTable): continue
+    if op({tkAdd: ekAdd, tkSubtract: ekSubtract}.toTable): continue
+
+  # Handle final token
   case arr.head.value.kind:
     of tkEquation:
       result = arr.head.value.e
