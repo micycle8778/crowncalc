@@ -79,7 +79,7 @@ var
   window: WindowPtr
   render: RendererPtr
 
-window = createWindow("CrownCalc", 100, 100, width, height, SDL_WINDOW_SHOWN)
+window = createWindow("Crowncalc", 100, 100, width, height, SDL_WINDOW_SHOWN)
 render = createRenderer(window, -1, Renderer_Accelerated or Renderer_PresentVsync or Renderer_TargetTexture)
 
 var

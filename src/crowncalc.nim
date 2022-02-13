@@ -4,6 +4,20 @@ import std/sets
 import std/strformat
 import std/unicode
 
+## Crowncalc is a library for parsing strings into math equations, which can then be
+## solved.
+
+runnableExamples:
+  assert "2+2".solve == 4
+  assert "1+2+3+4+5".solve == 15
+  assert "5*2".solve == 10
+  assert "10+5*2".solve == 20 # Order of operations, this doesn't resolve to 15*2 -> 30
+  assert "12*-5".solve == -60 # Negative numbers
+  assert "10+10%".solve == 11 # Percentages
+  assert "10*20%".solve == 20 # 10 * (10 * 0.2) -> 10 * 2 -> 20
+  assert "(10+2)*5".solve == 60 # Groups
+  assert "1.25*2".solve == 2.50 # Decimals
+
 type 
   EquationKind* = enum
     ekNumber, ekAdd, ekSubtract, ekMultiply, ekDivide
@@ -31,23 +45,29 @@ type
   ParseError* = object of CalcError
   SolveError* = object of CalcError
 
-converter toEquation*(f: float): Equation =
-  Equation(kind: ekNumber, n: f)
-
-converter toEquation*(i: int): Equation =
-  Equation(kind: ekNumber, n: i.float)
-
 func makeAdd*(l, r: Equation): Equation =
+  ## Helper function for making equation objects
   Equation(kind: ekAdd, left: l, right: r)
 
 func makeSubtract*(l, r: Equation): Equation =
+  ## Helper function for making equation objects
   Equation(kind: ekSubtract, left: l, right: r)
 
 func makeMultiply*(l, r: Equation): Equation =
+  ## Helper function for making equation objects
   Equation(kind: ekMultiply, left: l, right: r)
 
 func makeDivide*(l, r: Equation): Equation =
+  ## Helper function for making equation objects
   Equation(kind: ekDivide, left: l, right: r)
+
+converter toEquation*(f: float): Equation =
+  ## Helper function for making equation objects
+  Equation(kind: ekNumber, n: f)
+
+converter toEquation*(i: int): Equation =
+  ## Helper function for making equation objects
+  Equation(kind: ekNumber, n: i.float)
 
 func excludeChars(s: string, chars: HashSet[char]): string =
   for c in s:
@@ -72,6 +92,7 @@ proc `$`(L: SinglyLinkedList[Rune]): string =
     result.add $r
 
 func lexString*(s: string): TokenString =
+  ## Convert a string into a list of tokens that the computer can understand
   var s = s.excludeChars([',', '\'', '_', ' '].toHashSet)
   if s == "":
     raise LexError.newException("Empty expression")
@@ -125,6 +146,7 @@ func lexString*(s: string): TokenString =
         raise LexError.newException(fmt"Unknown character '{arr.head.value}'")
 
 func parseTokens*(arr: TokenString): Equation =
+  ## Convert a list of tokens into an equation that can be solved
   var arr = arr
   const val_tokens = [tkNumber, tkEquation, tkPercentage].toHashSet
 
@@ -200,9 +222,9 @@ func parseTokens*(arr: TokenString): Equation =
           let rkind = flag.next.next.value.kind
           case rkind:
             of tkEquation:
-              t = Token(kind: tkEquation, e: Equation(kind: ekMultiply, left: -1, right: flag.next.next.value.e))
+              t = Token(kind: tkEquation, e: makeMultiply(-1, flag.next.next.value.e))
             of tkNumber:
-              t = Token(kind: tkEquation, e: Equation(kind: ekMultiply, left: -1, right: flag.next.next.value.n))
+              t = Token(kind: tkEquation, e: makeMultiply(-1, flag.next.next.value.n))
             of tkPercentage:
               t = Token(kind: tkPercentage, n: flag.next.next.value.n * -1)
             else:
@@ -235,10 +257,10 @@ func parseTokens*(arr: TokenString): Equation =
       ]#
 
       if flag.value.kind == tkMultiply:
-        let eq = Token(kind: tkEquation, e: Equation(kind: ekMultiply, left: left, right: right))
+        let eq = Token(kind: tkEquation, e: makeMultiply(left, right))
         arr.snipAndReplace(flag.prev.prev, flag.next.next, eq)
       else:
-        let eq = Token(kind: tkEquation, e: Equation(kind: ekDivide, left: left, right: right))
+        let eq = Token(kind: tkEquation, e: makeDivide(left, right))
         arr.snipAndReplace(flag.prev.prev, flag.next.next, eq)
     
     # add / sub
@@ -301,6 +323,7 @@ func parseTokens*(arr: TokenString): Equation =
       raise ParseError.newException("Isolated operator")
 
 func solve*(e: Equation): float =
+  ## Solve the equation
   case e.kind:
     of ekNumber:
       e.n
@@ -318,4 +341,5 @@ func solve*(e: Equation): float =
         e.left.solve() / right
 
 func solve*(s: string): float =
+  ## Alias for `s.lexString.parseTokens.solve`
   s.lexString.parseTokens.solve

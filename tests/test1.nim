@@ -17,6 +17,9 @@ test "divide":
 test "subtract negative":
   check "2-3".solve == -1
 
+test "many numbers":
+  check "1+2+3+4".solve == 10
+
 test "float test":
   check "1.25*2".solve == 2.5
 
@@ -33,3 +36,9 @@ test "percentage":
 test "negative percentage":
   check "10+-10%".solve == 9
   check "10*-10%".solve == -10
+
+test "order of operations":
+  check "3+2*5".solve == 13
+
+test "groups":
+  check "(3+2)*5".solve == 25

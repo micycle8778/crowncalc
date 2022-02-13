@@ -5,7 +5,7 @@ author        = "Rainbow Asteroids"
 description   = "Basic calculator in Nim"
 license       = "MIT"
 srcDir        = "src"
-installFiles  = @["crowncalc.nim"]
+installExt    = @["nim"]
 bin           = @["ccalccli", "ccalc"]
 
 
