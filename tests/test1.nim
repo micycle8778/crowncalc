@@ -23,6 +23,9 @@ test "groups":
 test "subtract negative":
   check "2-3".solve == -1
 
+test "negative exponent"
+  check "2^-2".solve == -0.25
+
 test "many numbers":
   check "1+2+3+4".solve == 10
 

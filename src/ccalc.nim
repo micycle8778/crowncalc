@@ -12,9 +12,13 @@ type
     s: string
     resultMode: bool
     errorMode: bool
-
+    history: seq[string]
+    # Note that this pointer is in reverse, so 1 -> ^1, or the end of the history.
+    # historyPtr points to the previous thing in history, not the current thing
+    # being shown.
+    historyPtr: Natural 
 proc initResultString(): ResultString =
-  ResultString(s: "", resultMode: false)
+  ResultString(s: "", resultMode: false, errorMode: false, history: newSeq[string](), historyPtr: 1)
 
 proc clear(rs: var ResultString) =
   rs.resultMode = false
@@ -32,6 +36,9 @@ proc extend(rs: var ResultString, s: string) =
   rs.s.add s
 
 proc solve(rs: var ResultString) =
+  rs.history.add rs.s
+  rs.historyPtr = 1
+
   if rs.errorMode:
     rs.clear
   else:
@@ -48,6 +55,19 @@ proc shrink(rs: var ResultString) =
   else:
     rs.s.setLen(max(0, rs.s.len - 1))
 
+proc prev(rs: var ResultString) =
+  rs.errorMode = false
+  rs.s = rs.history[^rs.historyPtr]
+  rs.historyPtr = min(rs.history.len, succ rs.historyPtr)
+
+proc next(rs: var ResultString) =
+  rs.errorMode = false
+  if rs.historyPtr != 1:
+    rs.historyPtr = max(pred rs.historyPtr, 1)
+    rs.s = rs.history[^rs.historyPtr]
+  else:
+    rs.clear
+    
 
 # Init
 doAssert sdl2.init(INIT_EVERYTHING) == SdlSuccess
@@ -138,14 +158,19 @@ proc textButton(render: RendererPtr, x, y, height, width: cint, text: string, le
   if button(render, x, y, height, width, text, left_border):
     expression.extend text
 
+# startTextInput creates these wonderful TextInput events that make life a
+# whole lot easier
 startTextInput()
 
 while runGame:
   while pollEvent(evt):
+    # # Event handling
     case evt.kind:
       of QuitEvent:
         runGame = false
         break
+      # TextInput mainly handles the stuff you type into the calculator, like
+      # numbers and operators
       of TextInput:
         let c = evt.text.text[0]
         let allowed = ['0', '1', '2', '3', '4', '5', '6', '7', '8', '9', '-', '+', '/',
@@ -157,6 +182,8 @@ while runGame:
           elif c == '*':
             s = "×"
           expression.extend s
+      # KeyDown handles the stuff that affects the calculator, like backspace
+      # and clear
       of KeyDown:
         if evt.key.keysym.scancode in [SDL_SCANCODE_RETURN, SDL_SCANCODE_KP_ENTER].toHashSet:
           expression.solve
@@ -164,6 +191,11 @@ while runGame:
           expression.clear
         if evt.key.keysym.scancode in [SDL_SCANCODE_BACKSPACE, SDL_SCANCODE_KP_BACKSPACE].toHashSet:
           expression.shrink
+        if evt.key.keysym.scancode == SDL_SCANCODE_DOWN:
+          expression.next
+        if evt.key.keysym.scancode == SDL_SCANCODE_UP:
+          expression.prev
+
       else:
         discard
   # # Generate button sizes

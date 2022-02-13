@@ -1,3 +1,1 @@
- - Implement history for `ccalc` and `ccalccli`
- - Implement exponents
  - Add comments
