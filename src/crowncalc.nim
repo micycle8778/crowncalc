@@ -2,6 +2,7 @@ import std/lists
 import std/parseutils
 import std/sets
 import std/strformat
+import std/tables
 import std/unicode
 
 ## Crowncalc is a library for parsing strings into math equations, which can then be
@@ -202,18 +203,21 @@ func parseTokens*(arr: TokenString): Equation =
 
       arr.snipAndReplace(front.prev, back.next, eq)
 
-    # TODO: Dry this code
-    # mul / div
-    block:
+    proc op(opTable: Table[TokenKind, EquationKind]) =
       var flag = arr.head
-      while not flag.isNil and (flag.value.kind != tkMultiply and flag.value.kind != tkDivide):
+      # Scan for the operator
+      while not flag.isNil and flag.value.kind notin opTable:
         flag = flag.next
 
+      # Break out of the block if the operator isn't found
       if flag.isNil:
-        break
+        return
 
+      # Check that there is a number on the left and right of the operator
       if (flag == arr.head or flag == arr.tail) or 
         (flag.prev.value.kind notin val_tokens or flag.next.value.kind notin val_tokens):
+        # If there's a negative to the right of us, that probably means there's a
+        # negative number there
         if flag.next.value.kind == tkSubtract:
           if flag.next.next.value.kind notin val_tokens:
             raise ParseError.newException(fmt"Misplaced '-'")
@@ -230,14 +234,15 @@ func parseTokens*(arr: TokenString): Equation =
             else:
               discard
           arr.snipAndReplace(flag, flag.next.next.next, t)
-        else:
-          let c = if flag.value.kind == tkMultiply: '*' else: '/'
-          raise ParseError.newException(fmt"Misplaced '{c}'")
 
+        # Clearly, this must be a malformed equation
+        else:
+          raise ParseError.newException(fmt"Misplaced '{flag.value.kind}'")
 
       if flag.prev.value.kind == tkPercentage:
         raise ParseError.newException("Percentages are only supported on the rightside of the operator")
 
+      # Find the left and right equations
       let left = if flag.prev.value.kind == tkEquation: flag.prev.value.e else: flag.prev.value.n
       let rKind = flag.next.value.kind
       var right: Equation
@@ -248,69 +253,23 @@ func parseTokens*(arr: TokenString): Equation =
         right = Equation(kind: ekNumber, n: flag.next.value.n)
       elif rKind == tkPercentage:
         right = makeMultiply(left, makeDivide(flag.next.value.n, 100))
-     
-      # The following code won't compile because the Nim compiler is too dumb
-      #[
-      let kind = if flag.value.kind == tkMultiply: ekMultiply else: ekDivide
-      let eq = Token(kind: tkEquation, e: Equation(kind: kind, left: left, right: right))
+
+      # Make the equation and replace the parsed tokens
+      let eq = case opTable[flag.value.kind]:
+        of ekAdd:
+          Token(kind: tkEquation, e: Equation(kind: ekAdd, left: left, right: right))
+        of ekSubtract:
+          Token(kind: tkEquation, e: Equation(kind: ekSubtract, left: left, right: right))
+        of ekMultiply:
+          Token(kind: tkEquation, e: Equation(kind: ekMultiply, left: left, right: right))
+        of ekDivide:
+          Token(kind: tkEquation, e: Equation(kind: ekDivide, left: left, right: right))
+        of ekNumber:
+          raise Defect.newException("Unsupported Equation Kind")
       arr.snipAndReplace(flag.prev.prev, flag.next.next, eq)
-      ]#
 
-      if flag.value.kind == tkMultiply:
-        let eq = Token(kind: tkEquation, e: makeMultiply(left, right))
-        arr.snipAndReplace(flag.prev.prev, flag.next.next, eq)
-      else:
-        let eq = Token(kind: tkEquation, e: makeDivide(left, right))
-        arr.snipAndReplace(flag.prev.prev, flag.next.next, eq)
-    
-    # add / sub
-    block:
-      var flag = arr.head
-      while not flag.isNil and (flag.value.kind != tkAdd and flag.value.kind != tkSubtract):
-        flag = flag.next
-
-      if flag.isNil:
-        break
-
-      if (flag == arr.head or flag == arr.tail) or 
-        (flag.prev.value.kind notin val_tokens or flag.next.value.kind notin val_tokens):
-        if flag.next.value.kind == tkSubtract:
-          if flag.next.next.value.kind notin val_tokens:
-            raise ParseError.newException(fmt"Misplaced '-'")
-
-          var t: Token
-          let rkind = flag.next.next.value.kind
-          case rkind:
-            of tkEquation:
-              t = Token(kind: tkEquation, e: Equation(kind: ekMultiply, left: -1, right: flag.next.next.value.e))
-            of tkNumber:
-              t = Token(kind: tkEquation, e: Equation(kind: ekMultiply, left: -1, right: flag.next.next.value.n))
-            of tkPercentage:
-              t = Token(kind: tkPercentage, n: flag.next.next.value.n * -1)
-            else:
-              discard
-          arr.snipAndReplace(flag, flag.next.next.next, t)
-        else:
-          let c = if flag.value.kind == tkMultiply: '*' else: '/'
-          raise ParseError.newException(fmt"Misplaced '{c}'")
-
-      let left = if flag.prev.value.kind == tkEquation: flag.prev.value.e else: flag.prev.value.n
-      let rKind = flag.next.value.kind
-      var right: Equation
-      
-      if rKind == tkEquation:
-        right = flag.next.value.e
-      elif rKind == tkNumber:
-        right = Equation(kind: ekNumber, n: flag.next.value.n)
-      elif rKind == tkPercentage:
-        right = makeMultiply(left, makeDivide(flag.next.value.n, 100))
-
-      if flag.value.kind == tkAdd:
-        let eq = Token(kind: tkEquation, e: Equation(kind: ekAdd, left: left, right: right))
-        arr.snipAndReplace(flag.prev.prev, flag.next.next, eq)
-      else:
-        let eq = Token(kind: tkEquation, e: Equation(kind: ekSubtract, left: left, right: right))
-        arr.snipAndReplace(flag.prev.prev, flag.next.next, eq)
+    op({tkMultiply: ekMultiply, tkDivide: ekDivide}.toTable)
+    op({tkAdd: ekAdd, tkSubtract: ekSubtract}.toTable)
 
   case arr.head.value.kind:
     of tkEquation:

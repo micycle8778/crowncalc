@@ -40,5 +40,8 @@ test "negative percentage":
 test "order of operations":
   check "3+2*5".solve == 13
 
+test "order of operations 2":
+  check "2-15+3".solve == -10
+
 test "groups":
   check "(3+2)*5".solve == 25
