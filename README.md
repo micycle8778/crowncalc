@@ -9,7 +9,7 @@ calculator. Installation instructions exist at
 ## Usage
 Crowncalc is fairly straight forward.
 
-### `ccalc`
+### `crowncalc`
 ![ccalc screenshot](ccalc.png)
 
 ### `ccalccli`
@@ -21,7 +21,7 @@ Crowncalc is fairly straight forward.
 Goodbye!
 ```
 
-### `crowncalc`
+### `crowncalc` library
 ```nim
 import crowncalc
 
