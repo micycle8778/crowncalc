@@ -1,6 +1,0 @@
- - Variable GUI size
- - DRY `crowncalc.parseTokens`
- - Implement history for `ccalc` and `ccalccli`
- - Implement exponents
- - Elaborate `README.md`
- - Add comments
