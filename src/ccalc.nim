@@ -1,6 +1,7 @@
 import std/math
 import std/sets
 import std/tables
+import std/unicode
 import crowncalc
 import sdl2
 import sdl2/ttf
@@ -56,6 +57,8 @@ proc shrink(rs: var ResultString) =
   # Backspace
   if rs.resultMode or rs.errorMode:
     rs.clear
+  elif rs.s.len != 0:
+    rs.s.setLen(rs.s.len - rs.s[^1].Rune.size)
   else:
     rs.s.setLen(max(0, rs.s.len - 1))
 
