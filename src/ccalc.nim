@@ -114,7 +114,7 @@ var
   window: WindowPtr
   render: RendererPtr
 
-window = createWindow("Crowncalc", 100, 100, 720, 640, SDL_WINDOW_SHOWN or SDL_WINDOW_RESIZABLE)
+window = createWindow("Crowncalc", 100, 100, 560, 720, SDL_WINDOW_SHOWN or SDL_WINDOW_RESIZABLE)
 render = createRenderer(window, -1, Renderer_Accelerated or Renderer_PresentVsync or Renderer_TargetTexture)
 
 var
@@ -149,7 +149,7 @@ proc button(render: RendererPtr, x, y, width, height: cint, text: string, left_b
   render.fillRect(rect)
 
   # # Render Text
-  let font = getFont(getOptimalFontSize(width, height, 1)) # WARN: hardcoded 1 could bite me later
+  let font = getFont(getOptimalFontSize((width.float * 0.8).int, (height.float * 0.8).int, 1))
   let surface = renderUTF8Blended(font, text, btnFg)
   let texture = createTextureFromSurface(render, surface)
 
